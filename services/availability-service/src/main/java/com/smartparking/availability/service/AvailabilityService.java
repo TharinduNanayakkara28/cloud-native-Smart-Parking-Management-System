@@ -114,6 +114,20 @@ public class AvailabilityService {
         return result;
     }
 
+    public String getSpotState(String spotId) {
+        String state = redisTemplate.opsForValue().get(String.format(SPOT_STATE_KEY, spotId));
+        return state != null ? state : "FREE";
+    }
+
+    public void markSpotState(String spotId, String newState) {
+        try {
+            redisTemplate.opsForValue().set(String.format(SPOT_STATE_KEY, spotId), newState);
+            redisTemplate.delete(FULL_MAP_CACHE_KEY);
+        } catch (Exception e) {
+            log.error("Redis update failed for spot {} → {}: {}", spotId, newState, e.getMessage());
+        }
+    }
+
     private List<AvailableSpotResponse> buildFreeSpots(List<AvailabilitySpot> spots, List<String> states) {
         return buildResponses(spots, states, true);
     }

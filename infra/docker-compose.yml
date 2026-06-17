@@ -76,6 +76,22 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres-reservation:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: reservationdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_reservation_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d reservationdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:7-alpine
     ports:
@@ -122,6 +138,8 @@ services:
       SIMULATOR_SERVICE_URL: http://sensor-simulator:8082
       SPOT_DETECTION_SERVICE_URL: http://spot-detection-service:8083
       AVAILABILITY_SERVICE_URL: http://availability-service:8084
+      RESERVATION_SERVICE_URL: http://reservation-service:8085
+      PAYMENT_SERVICE_URL: http://payment-service:8086
       JWT_SECRET: dev-secret-key-change-in-production-32chars!
     depends_on:
       user-service:
@@ -203,9 +221,88 @@ services:
       retries: 5
       start_period: 30s
 
+  # ──────────────────────────────────────────
+  # Phase 4: Reservation Service
+  # ──────────────────────────────────────────
+
+  reservation-service:
+    build:
+      context: ../services/reservation-service
+    ports:
+      - "8085:8085"
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres-reservation:5432/reservationdb
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      REDIS_HOST: redis
+      KAFKA_BROKER: kafka:9092
+      AVAILABILITY_SERVICE_URL: http://availability-service:8084
+    depends_on:
+      postgres-reservation:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      availability-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ──────────────────────────────────────────
+  # Phase 5: Payment Service
+  # ──────────────────────────────────────────
+
+  postgres-payment:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: paymentdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres_payment_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d paymentdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  payment-service:
+    build:
+      context: ../services/payment-service
+    ports:
+      - "8086:8086"
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres-payment:5432/paymentdb
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      KAFKA_BROKER: kafka:9092
+      PAYMENT_HOURLY_RATE: "2.00"
+      PAYMENT_CURRENCY: USD
+      MOCK_FAILURE_RATE: "0.0"
+    depends_on:
+      postgres-payment:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8086/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 volumes:
   kafka_data:
   postgres_user_data:
   postgres_spot_data:
   postgres_availability_data:
+  postgres_reservation_data:
+  postgres_payment_data:
   redis_data:

@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/spots")
@@ -15,13 +17,6 @@ public class AvailabilityController {
 
     private final AvailabilityService availabilityService;
 
-    /**
-     * Find available (FREE) spots within radiusMeters of a given location.
-     *
-     * @param lat          Latitude of the search centre
-     * @param lng          Longitude of the search centre
-     * @param radius       Search radius in metres (default 500m)
-     */
     @GetMapping("/available")
     public ResponseEntity<List<AvailableSpotResponse>> getAvailableSpots(
             @RequestParam double lat,
@@ -30,12 +25,18 @@ public class AvailabilityController {
         return ResponseEntity.ok(availabilityService.getAvailableSpots(lat, lng, radius));
     }
 
-    /**
-     * Returns all spots with their current state from the Redis + 5s burst cache.
-     * Useful for dashboard views and the Simulation Dashboard UI.
-     */
     @GetMapping("/state")
     public ResponseEntity<List<AvailableSpotResponse>> getAllSpotStates() {
         return ResponseEntity.ok(availabilityService.getAllSpotStates());
+    }
+
+    /**
+     * Internal endpoint used by reservation-service to check a spot's state before locking.
+     * Not routed through the public gateway — called service-to-service only.
+     */
+    @GetMapping("/{spotId}/state")
+    public ResponseEntity<Map<String, String>> getSpotState(@PathVariable UUID spotId) {
+        String state = availabilityService.getSpotState(spotId.toString());
+        return ResponseEntity.ok(Map.of("spotId", spotId.toString(), "state", state));
     }
 }

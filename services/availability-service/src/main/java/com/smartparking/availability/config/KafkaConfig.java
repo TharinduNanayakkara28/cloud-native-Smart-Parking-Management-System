@@ -10,10 +10,17 @@ import org.springframework.kafka.config.TopicBuilder;
 @Configuration
 public class KafkaConfig {
 
-    // Declare the topic so it is created if it doesn't exist yet
     @Bean
     public NewTopic spotStateTopic() {
         return TopicBuilder.name("spot-state")
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
+    public NewTopic reservationEventsTopic() {
+        return TopicBuilder.name("reservation-events")
                 .partitions(3)
                 .replicas(1)
                 .build();

@@ -47,6 +47,22 @@ spring:
           predicates:
             - Path=/ws/availability/**
 
+        # Phase 4 — Reservation Service (JWT protected)
+        - id: reservation-route
+          uri: ${RESERVATION_SERVICE_URL:http://localhost:8085}
+          predicates:
+            - Path=/reservations/**
+          filters:
+            - JwtAuthentication
+
+        # Phase 5 — Payment Service (JWT protected)
+        - id: payment-route
+          uri: ${PAYMENT_SERVICE_URL:http://localhost:8086}
+          predicates:
+            - Path=/payments/**
+          filters:
+            - JwtAuthentication
+
         # Phase 2 — Spot Detection Service admin (JWT protected)
         - id: spot-admin-route
           uri: ${SPOT_DETECTION_SERVICE_URL:http://localhost:8083}
