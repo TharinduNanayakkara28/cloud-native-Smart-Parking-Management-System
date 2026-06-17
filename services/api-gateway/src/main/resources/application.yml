@@ -7,6 +7,7 @@ spring:
   cloud:
     gateway:
       routes:
+        # Phase 1 — User Service
         - id: auth-route
           uri: ${USER_SERVICE_URL:http://localhost:8081}
           predicates:
@@ -16,6 +17,41 @@ spring:
           uri: ${USER_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/users/**
+          filters:
+            - JwtAuthentication
+
+        # Phase 2 — Sensor Simulator (no JWT — admin/demo control)
+        - id: simulator-route
+          uri: ${SIMULATOR_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/simulate/**
+
+        # Phase 3 — Availability Service: /spots/available BEFORE /spots/** catch-all
+        - id: availability-query-route
+          uri: ${AVAILABILITY_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/spots/available
+          filters:
+            - JwtAuthentication
+
+        - id: availability-state-route
+          uri: ${AVAILABILITY_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/spots/state
+          filters:
+            - JwtAuthentication
+
+        # Phase 3 — WebSocket (STOMP/SockJS — no JWT on connect)
+        - id: ws-availability-route
+          uri: ${AVAILABILITY_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/ws/availability/**
+
+        # Phase 2 — Spot Detection Service admin (JWT protected)
+        - id: spot-admin-route
+          uri: ${SPOT_DETECTION_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/spots/**
           filters:
             - JwtAuthentication
 
