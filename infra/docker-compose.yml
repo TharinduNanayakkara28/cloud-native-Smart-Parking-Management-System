@@ -140,6 +140,8 @@ services:
       AVAILABILITY_SERVICE_URL: http://availability-service:8084
       RESERVATION_SERVICE_URL: http://reservation-service:8085
       PAYMENT_SERVICE_URL: http://payment-service:8086
+      PENALTY_SERVICE_URL: http://penalty-service:8087
+      NOTIFICATION_SERVICE_URL: http://notification-service:8088
       JWT_SECRET: dev-secret-key-change-in-production-32chars!
     depends_on:
       user-service:
@@ -298,6 +300,95 @@ services:
       retries: 5
       start_period: 30s
 
+  # ──────────────────────────────────────────
+  # Phase 6: Penalty Service
+  # ──────────────────────────────────────────
+
+  postgres-penalty:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: penaltydb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres_penalty_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d penaltydb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  penalty-service:
+    build:
+      context: ../services/penalty-service
+    ports:
+      - "8087:8087"
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres-penalty:5432/penaltydb
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      REDIS_HOST: redis
+      KAFKA_BROKER: kafka:9092
+      PENALTY_TIER2_AMOUNT: "10.00"
+      PENALTY_TIER3_AMOUNT: "25.00"
+    depends_on:
+      postgres-penalty:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8087/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ──────────────────────────────────────────
+  # Phase 7: Notification Service
+  # ──────────────────────────────────────────
+
+  postgres-notification:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: notificationdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5438:5432"
+    volumes:
+      - postgres_notification_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notificationdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notification-service:
+    build:
+      context: ../services/notification-service
+    ports:
+      - "8088:8088"
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres-notification:5432/notificationdb
+      DB_USER: postgres
+      DB_PASS: postgres
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      postgres-notification:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8088/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 volumes:
   kafka_data:
   postgres_user_data:
@@ -305,4 +396,6 @@ volumes:
   postgres_availability_data:
   postgres_reservation_data:
   postgres_payment_data:
+  postgres_penalty_data:
+  postgres_notification_data:
   redis_data:
