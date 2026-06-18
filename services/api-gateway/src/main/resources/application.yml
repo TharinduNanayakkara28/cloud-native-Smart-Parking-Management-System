@@ -79,6 +79,14 @@ spring:
           filters:
             - JwtAuthentication
 
+        # Phase 8 — Analytics Service (JWT protected)
+        - id: analytics-route
+          uri: ${ANALYTICS_SERVICE_URL:http://localhost:8089}
+          predicates:
+            - Path=/analytics/**
+          filters:
+            - JwtAuthentication
+
         # Phase 2 — Spot Detection Service admin (JWT protected)
         - id: spot-admin-route
           uri: ${SPOT_DETECTION_SERVICE_URL:http://localhost:8083}
@@ -94,4 +102,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}

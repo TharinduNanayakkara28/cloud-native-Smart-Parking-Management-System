@@ -1,0 +1,54 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'api-gateway'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['api-gateway:8080']
+
+  - job_name: 'user-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['user-service:8081']
+
+  - job_name: 'sensor-simulator'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['sensor-simulator:8082']
+
+  - job_name: 'spot-detection-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['spot-detection-service:8083']
+
+  - job_name: 'availability-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['availability-service:8084']
+
+  - job_name: 'reservation-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['reservation-service:8085']
+
+  - job_name: 'payment-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['payment-service:8086']
+
+  - job_name: 'penalty-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['penalty-service:8087']
+
+  - job_name: 'notification-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['notification-service:8088']
+
+  - job_name: 'analytics-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['analytics-service:8089']

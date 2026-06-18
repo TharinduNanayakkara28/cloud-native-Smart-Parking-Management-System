@@ -1,0 +1,49 @@
+name: smart_parking
+description: Smart Parking Driver App
+version: 1.0.0+1
+publish_to: none
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # HTTP client
+  dio: ^5.4.3
+
+  # Navigation
+  go_router: ^13.2.0
+
+  # Secure token storage
+  flutter_secure_storage: ^9.0.0
+
+  # Forms with validation
+  reactive_forms: ^17.0.0
+
+  # Date/time formatting
+  intl: ^0.19.0
+
+  # Maps (Phase B)
+  flutter_map: ^6.2.1
+  latlong2: ^0.9.1
+
+  # WebSocket (Phase B)
+  web_socket_channel: ^2.4.5
+
+  # Local notifications (Phase E)
+  flutter_local_notifications: ^17.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  mockito: ^5.4.4
+  build_runner: ^2.4.9
+
+flutter:
+  uses-material-design: true

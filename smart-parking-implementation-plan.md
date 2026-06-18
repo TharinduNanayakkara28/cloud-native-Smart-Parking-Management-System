@@ -645,4 +645,334 @@ These are the questions you should be ready to answer about this project:
 
 ---
 
+## Phase 10 — Driver Mobile App (Flutter)
+
+### Overview
+
+A cross-platform Flutter application for drivers to find nearby parking spots, make reservations, pay, check in/out, and receive real-time alerts. All data comes from the existing Spring Boot backend via the API Gateway at `http://localhost:8080`.
+
+### Tech Stack
+
+| Concern | Library / Tool | Why |
+|---|---|---|
+| Framework | Flutter 3.x (Dart) | Single codebase for iOS + Android |
+| State Management | Riverpod 2 | Compile-safe, testable, no boilerplate |
+| HTTP Client | Dio + dio_interceptors | Interceptor for JWT attach + refresh |
+| Maps | flutter_map + OpenStreetMap | No billing key required |
+| WebSocket | web_socket_channel | Real-time spot updates |
+| Secure Storage | flutter_secure_storage | JWT tokens (Keychain / Keystore) |
+| Local Notifications | flutter_local_notifications | Overstay warning, reservation expiry |
+| Navigation | go_router | Declarative, deep-link ready |
+| Forms | reactive_forms | Validation without manual controllers |
+| Date/Time | intl | Formatting |
+| Testing | flutter_test + Mockito | Unit + widget tests |
+
+### Project Structure
+
+```
+mobile/
+├── lib/
+│   ├── main.dart
+│   ├── app.dart
+│   ├── core/
+│   │   ├── api/
+│   │   │   ├── api_client.dart
+│   │   │   ├── auth_interceptor.dart
+│   │   │   └── endpoints.dart
+│   │   ├── auth/
+│   │   │   ├── token_storage.dart
+│   │   │   └── auth_notifier.dart
+│   │   ├── websocket/
+│   │   │   └── availability_socket.dart
+│   │   └── router/
+│   │       └── app_router.dart
+│   ├── features/
+│   │   ├── auth/
+│   │   ├── map/
+│   │   ├── reservation/
+│   │   ├── payment/
+│   │   ├── penalty/
+│   │   ├── notification/
+│   │   ├── vehicle/
+│   │   └── profile/
+│   └── shared/
+│       ├── widgets/
+│       └── theme/
+├── test/
+├── pubspec.yaml
+└── README.md
+```
+
+### Screens & Navigation
+
+```
+/login                  LoginScreen
+/register               RegisterScreen
+/home                   MapScreen (bottom nav shell)
+  /home/map             MapScreen tab
+  /home/reservations    MyReservationsScreen tab
+  /home/notifications   NotificationsScreen tab (unread badge)
+  /home/profile         ProfileScreen tab
+/reservation/new        ReservationFormScreen
+/reservation/:id        ReservationDetailScreen
+/payment/:reservationId PaymentReceiptScreen
+/penalties              MyPenaltiesScreen
+/vehicles               VehiclesScreen
+```
+
+### Implementation Phases
+
+| Phase | Deliverable | Depends on |
+|---|---|---|
+| A | Auth (login, register, token storage) | — |
+| B | Spot map with real-time WebSocket updates | Phase A |
+| C | Reservation form + detail + list | Phase B |
+| D | Payment receipt screen | Phase C |
+| E | In-app notifications + local push | Phase C |
+| F | Penalties list + pay | Phase E |
+| G | Profile + vehicle management | Phase A |
+
+### Phase A — Auth
+
+**Screens:** `LoginScreen`, `RegisterScreen`
+
+**API calls:**
+```
+POST /auth/register    { name, email, password, phone }
+POST /auth/login       { email, password }
+POST /auth/refresh     { refreshToken }
+```
+
+- `AuthRepository` wraps Dio calls to `/auth/*`
+- `AuthNotifier` (Riverpod `AsyncNotifier`) holds `UserModel?`
+- `TokenStorage` stores `accessToken` + `refreshToken` in `flutter_secure_storage`
+- `AuthInterceptor` on Dio: attaches `Authorization: Bearer <token>` to every request; on 401, calls `/auth/refresh` once and retries; on second 401, clears tokens and redirects to login
+- `GoRouter` redirect: unauthenticated users always land on `/login`
+
+### Phase B — Spot Map
+
+**Screen:** `MapScreen` + `SpotBottomSheet`
+
+**API calls:**
+```
+GET /spots/available?lat=&lng=&radius=500
+WS  /ws/availability
+```
+
+- `flutter_map` with OpenStreetMap tiles
+- Green = free, amber = reserved, red = occupied
+- WebSocket updates spot state without re-fetch
+- Tap spot → `SpotBottomSheet` → Reserve button → `ReservationFormScreen`
+
+### Phase C — Reservation Flow
+
+**Screens:** `ReservationFormScreen`, `ReservationDetailScreen`, `MyReservationsScreen`
+
+- Vehicle picker, date/time pickers, estimated cost display
+- Polls `GET /reservations/{id}` every 5s while status is `PENDING`
+- Check In / Check Out / Cancel buttons based on status
+
+### Phase D — Payment Receipt
+
+- `GET /payments/{reservationId}` — shows amount, duration, reference
+- Optional PDF generation via `pdf` package
+
+### Phase E — Notifications
+
+- Unread badge polling every 30s
+- Tap notification → navigate to relevant screen
+- Local push via `flutter_local_notifications` for penalty warnings
+
+### Phase F — Penalties
+
+- Tier badges: WARNING (grey) / FINE (orange) / ESCALATED (red)
+- Pay Now with `AlertDialog` confirmation
+
+### Phase G — Profile & Vehicles
+
+- Display user info + logout
+- Manage saved vehicle plates
+
+### JWT Token Flow
+
+```
+App start → TokenStorage.read()
+  ├─ tokens exist → authenticated
+  └─ no tokens    → /login
+
+Every request: AuthInterceptor attaches Bearer token
+  └─ 401 → POST /auth/refresh → retry
+        └─ 401 again → clear tokens → /login
+```
+
+### Error Handling
+
+ProblemDetail errors from backend parsed to `AppException { status, title, detail }` and shown via `ErrorBanner` widget.
+
+### Testing Strategy
+
+| Layer | Tool | What to test |
+|---|---|---|
+| Repository | mockito + flutter_test | HTTP responses + error cases |
+| Notifiers | flutter_test | State transitions |
+| Widgets | WidgetTester | Form validation, loading states, badge counts |
+| Integration | integration_test | Full login → reserve → checkin → checkout |
+
+### Setup
+
+```bash
+cd mobile
+flutter pub get
+flutter run -d android    # Android emulator
+flutter run -d ios        # iOS simulator
+flutter test
+flutter build apk --release
+```
+
+### Environment Configuration
+
+```dart
+// lib/core/api/endpoints.dart
+const String kBaseUrl = String.fromEnvironment(
+  'BASE_URL',
+  defaultValue: 'http://10.0.2.2:8080',  // Android emulator → localhost
+);
+const String kWsUrl = String.fromEnvironment(
+  'WS_URL',
+  defaultValue: 'ws://10.0.2.2:8080/ws/availability',
+);
+```
+
+> Android emulator uses `10.0.2.2` to reach the host machine's `localhost`. iOS simulator uses `localhost` directly.
+
+---
+
+## Phase 11 — Operator Web Dashboard (React)
+
+### Overview
+
+A React + TypeScript single-page application for parking lot operators. Monitors live occupancy, tracks revenue, manages violations, and shows real-time spot state — all from the existing analytics API.
+
+### Tech Stack
+
+| Concern | Library / Tool | Why |
+|---|---|---|
+| Framework | React 18 + TypeScript | Industry standard; strong typing |
+| Build Tool | Vite | Fast dev server + HMR |
+| Styling | Tailwind CSS + shadcn/ui | Utility-first; pre-built accessible components |
+| State / Server Cache | TanStack Query v5 | Auto-refetch, caching, loading/error states |
+| Auth State | Zustand | Lightweight client state for token + user |
+| Charts | Recharts | Composable, works well with React |
+| Maps | react-leaflet + OpenStreetMap | Spot occupancy map |
+| WebSocket | native browser WebSocket | Real-time spot updates |
+| Forms | React Hook Form + Zod | Validation with TypeScript inference |
+| HTTP | Axios | Interceptors for JWT attach + refresh |
+| Routing | React Router v6 | Standard SPA routing |
+| Testing | Vitest + React Testing Library | Fast, Jest-compatible |
+
+### Project Structure
+
+```
+dashboard/
+├── src/
+│   ├── main.tsx
+│   ├── App.tsx
+│   ├── lib/
+│   │   ├── axios.ts
+│   │   ├── queryClient.ts
+│   │   └── websocket.ts
+│   ├── store/
+│   │   └── authStore.ts
+│   ├── types/
+│   │   ├── api.ts
+│   │   └── events.ts
+│   ├── hooks/
+│   │   ├── useAuth.ts
+│   │   ├── useOccupancy.ts
+│   │   ├── useRevenue.ts
+│   │   ├── useViolations.ts
+│   │   └── useSpotUpdates.ts
+│   ├── pages/
+│   │   ├── LoginPage.tsx
+│   │   ├── DashboardPage.tsx
+│   │   ├── OccupancyPage.tsx
+│   │   ├── RevenuePage.tsx
+│   │   ├── ViolationsPage.tsx
+│   │   └── EventsPage.tsx
+│   └── components/
+│       ├── layout/
+│       ├── dashboard/
+│       ├── occupancy/
+│       ├── revenue/
+│       ├── violations/
+│       └── shared/
+├── vite.config.ts
+├── tailwind.config.ts
+└── package.json
+```
+
+### Pages & Routing
+
+```
+/login        LoginPage          (public)
+/             DashboardPage      (KPI cards + mini charts)
+/occupancy    OccupancyPage      (live map + date filter)
+/revenue      RevenuePage        (line chart + week|month toggle)
+/violations   ViolationsPage     (table + tier pie chart)
+/events       EventsPage         (raw event log + type filter)
+```
+
+### Dashboard Layout
+
+```
+┌────────────────────────────────────────────────┐
+│  KPI Cards: Net Revenue | Reservations | Violations | Uptime  │
+├───────────────────────┬────────────────────────┤
+│  Revenue (week)       │  Violation Pie Chart   │
+│  [RevenueLineChart]   │  T1:grey T2:orange T3:red │
+├───────────────────────┴────────────────────────┤
+│  Today's Hourly Occupancy [HourlyBarChart]      │
+├────────────────────────────────────────────────┤
+│  Recent Events (last 10) [EventsTable mini]     │
+└────────────────────────────────────────────────┘
+```
+
+### API Hooks (TanStack Query)
+
+```ts
+useRevenue('week')    → GET /analytics/revenue?period=week    refetchInterval: 60s
+useOccupancy(date)    → GET /analytics/occupancy?date=        refetchInterval: 30s
+useViolations()       → GET /analytics/violations             refetchInterval: 60s
+```
+
+### Implementation Phases
+
+| Phase | Deliverable |
+|---|---|
+| A | Project setup, routing, auth, Axios + JWT refresh |
+| B | Dashboard overview — KPI cards + charts |
+| C | Occupancy page — live map + WebSocket |
+| D | Revenue page — line chart + period toggle |
+| E | Violations page — pie chart + table |
+| F | Events page — raw log with type filter |
+| G | Polish — responsive layout, loading skeletons, error boundaries |
+
+### Setup
+
+```bash
+cd dashboard
+npm install
+npm run dev         # Dev server at http://localhost:5173
+npm run test
+npm run build
+```
+
+**.env.local:**
+```env
+VITE_API_URL=http://localhost:8080
+VITE_WS_URL=ws://localhost:8080/ws/availability
+```
+
+---
+
 *Built as a portfolio project demonstrating: event-driven microservices, distributed locking, saga pattern, geospatial queries, real-time WebSocket push, and scheduled enforcement jobs.*
