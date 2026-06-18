@@ -8,7 +8,12 @@ import '../../features/map/presentation/map_screen.dart';
 import '../../features/reservation/presentation/reservation_form_screen.dart';
 import '../../features/reservation/presentation/reservation_detail_screen.dart';
 import '../../features/reservation/presentation/my_reservations_screen.dart';
-import '../../shared/widgets/placeholder_screen.dart';
+import '../../features/payment/presentation/payment_receipt_screen.dart';
+import '../../features/notification/presentation/notifications_screen.dart';
+import '../../features/notification/data/notification_repository.dart';
+import '../../features/penalty/presentation/my_penalties_screen.dart';
+import '../../features/vehicle/presentation/vehicles_screen.dart';
+import '../../features/profile/presentation/profile_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final notifier = _RouterNotifier(ref);
@@ -25,7 +30,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/register',
         builder: (_, __) => const RegisterScreen(),
       ),
-      // Full-screen routes outside the bottom-nav shell
       GoRoute(
         path: '/reservation/new',
         builder: (_, state) => ReservationFormScreen(
@@ -41,9 +45,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/payment/:reservationId',
-        builder: (_, state) => PlaceholderScreen(
-          title: 'Receipt ${state.pathParameters['reservationId']} — Phase D',
+        builder: (_, state) => PaymentReceiptScreen(
+          reservationId: state.pathParameters['reservationId'] ?? '',
         ),
+      ),
+      GoRoute(
+        path: '/penalties',
+        builder: (_, __) => const MyPenaltiesScreen(),
+      ),
+      GoRoute(
+        path: '/vehicles',
+        builder: (_, __) => const VehiclesScreen(),
       ),
       ShellRoute(
         builder: (_, __, child) => _HomeShell(child: child),
@@ -58,13 +70,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/home/notifications',
-            builder: (_, __) =>
-                const PlaceholderScreen(title: 'Notifications — Phase E'),
+            builder: (_, __) => const NotificationsScreen(),
           ),
           GoRoute(
             path: '/home/profile',
-            builder: (_, __) =>
-                const PlaceholderScreen(title: 'Profile — Phase G'),
+            builder: (_, __) => const ProfileScreen(),
           ),
         ],
       ),
@@ -94,16 +104,17 @@ class _RouterNotifier extends ChangeNotifier {
   }
 }
 
-class _HomeShell extends StatelessWidget {
+class _HomeShell extends ConsumerWidget {
   const _HomeShell({required this.child});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).matchedLocation;
+    final unreadCount = ref.watch(unreadCountProvider).valueOrNull ?? 0;
 
-    int _tabIndex() {
+    int tabIndex() {
       if (location.startsWith('/home/map')) return 0;
       if (location.startsWith('/home/reservations')) return 1;
       if (location.startsWith('/home/notifications')) return 2;
@@ -114,7 +125,7 @@ class _HomeShell extends StatelessWidget {
     return Scaffold(
       body: child,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _tabIndex(),
+        selectedIndex: tabIndex(),
         onDestinationSelected: (i) {
           switch (i) {
             case 0:
@@ -127,15 +138,35 @@ class _HomeShell extends StatelessWidget {
               context.go('/home/profile');
           }
         },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.map_outlined), label: 'Map'),
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map),
+            label: 'Map',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.bookmark_outlined),
+            selectedIcon: Icon(Icons.bookmark),
+            label: 'Reservations',
+          ),
           NavigationDestination(
-              icon: Icon(Icons.bookmark_outlined), label: 'Reservations'),
-          NavigationDestination(
-              icon: Icon(Icons.notifications_outlined),
-              label: 'Notifications'),
-          NavigationDestination(
-              icon: Icon(Icons.person_outlined), label: 'Profile'),
+            icon: Badge(
+              isLabelVisible: unreadCount > 0,
+              label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            selectedIcon: Badge(
+              isLabelVisible: unreadCount > 0,
+              label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
+              child: const Icon(Icons.notifications),
+            ),
+            label: 'Notifications',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
         ],
       ),
     );
