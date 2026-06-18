@@ -4,6 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../auth/auth_notifier.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
+import '../../features/map/presentation/map_screen.dart';
+import '../../features/reservation/presentation/reservation_form_screen.dart';
+import '../../features/reservation/presentation/reservation_detail_screen.dart';
+import '../../features/reservation/presentation/my_reservations_screen.dart';
 import '../../shared/widgets/placeholder_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -21,26 +25,46 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/register',
         builder: (_, __) => const RegisterScreen(),
       ),
+      // Full-screen routes outside the bottom-nav shell
+      GoRoute(
+        path: '/reservation/new',
+        builder: (_, state) => ReservationFormScreen(
+          spotId: state.uri.queryParameters['spotId'] ?? '',
+          spotNumber: state.uri.queryParameters['spotNumber'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/reservation/:id',
+        builder: (_, state) => ReservationDetailScreen(
+          reservationId: state.pathParameters['id'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/payment/:reservationId',
+        builder: (_, state) => PlaceholderScreen(
+          title: 'Receipt ${state.pathParameters['reservationId']} — Phase D',
+        ),
+      ),
       ShellRoute(
         builder: (_, __, child) => _HomeShell(child: child),
         routes: [
           GoRoute(
             path: '/home/map',
-            builder: (_, __) => const PlaceholderScreen(title: 'Map'),
+            builder: (_, __) => const MapScreen(),
           ),
           GoRoute(
             path: '/home/reservations',
-            builder: (_, __) =>
-                const PlaceholderScreen(title: 'My Reservations'),
+            builder: (_, __) => const MyReservationsScreen(),
           ),
           GoRoute(
             path: '/home/notifications',
             builder: (_, __) =>
-                const PlaceholderScreen(title: 'Notifications'),
+                const PlaceholderScreen(title: 'Notifications — Phase E'),
           ),
           GoRoute(
             path: '/home/profile',
-            builder: (_, __) => const PlaceholderScreen(title: 'Profile'),
+            builder: (_, __) =>
+                const PlaceholderScreen(title: 'Profile — Phase G'),
           ),
         ],
       ),
